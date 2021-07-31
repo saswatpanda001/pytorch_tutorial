@@ -1,0 +1,226 @@
+#include<Servo.h>
+Servo motor;
+
+#include "DHT.h"
+#define DHTPIN 4     
+#define DHTTYPE DHT11  
+DHT dht(DHTPIN, DHTTYPE);
+
+#define sensorPower 7
+#define sensorPin A3
+
+#define echoPin 2
+#define trigPin 3 
+
+int val = 0;
+int buzzerPin = 6;
+int flamePin = A1;
+int Flame;
+int val1;
+int smokeA0 = A5;
+int sensorThres = 400;
+
+int relay1 = 9;
+int relay2 = 10;
+
+int readSensor() {
+  digitalWrite(sensorPower, HIGH);  // Turn the sensor ON
+  
+  delay(10);              // wait 10 milliseconds
+  val = analogRead(sensorPin);    // Read the analog value form sensor
+  digitalWrite(sensorPower, LOW);   // Turn the sensor OFF
+  return val;             // send current reading
+}
+
+
+// defines variables
+long duration; // variable for the duration of sound wave travel
+int distance; // variable for the distance measurement
+
+
+Servo myservo;
+
+void setup() {
+  pinMode(buzzerPin, OUTPUT);
+  pinMode(flamePin, INPUT);
+  pinMode(smokeA0, INPUT);  
+  dht.begin();
+
+  pinMode(sensorPower, OUTPUT);
+  digitalWrite(sensorPower, LOW);
+
+
+  pinMode(relay1,OUTPUT);
+  pinMode(relay2,OUTPUT);
+
+  
+  myservo.attach(6);
+  myservo.write(90);
+  pinMode(trigPin, OUTPUT); // Sets the trigPin as an OUTPUT
+  pinMode(echoPin, INPUT); // Sets the echoPin as an INPUT
+  Serial.begin(9600); // // Serial Communication is starting with 9600 of baudrate speed
+ 
+}
+
+void loop() {
+
+
+  Flame = digitalRead(flamePin);
+
+  
+  if (Flame== 0)
+  {
+    Serial.println("Fire!!!");
+    digitalWrite(buzzerPin, HIGH);
+    delay(10000);
+    digitalWrite(buzzerPin, LOW);
+    
+  }
+  
+  else
+  {
+    Serial.println("No fire detected;Your home is safe");
+    
+  }
+
+
+ 
+  
+  
+  
+
+  
+  float h = dht.readHumidity();
+  
+  float t = dht.readTemperature();
+ 
+  float f = dht.readTemperature(true);
+
+  // Check if any reads failed and exit early (to try again).
+  if (isnan(h) || isnan(t) || isnan(f)) {
+    Serial.println(F("Failed to read from DHT sensor!"));
+    return;
+  }
+
+  // Compute heat index in Fahrenheit (the default)
+  float hif = dht.computeHeatIndex(f, h);
+  // Compute heat index in Celsius (isFahreheit = false)
+  float hic = dht.computeHeatIndex(t, h, false);
+  Serial.print(F(" Humidity: "));
+  Serial.print(h);
+  Serial.print(F("%  Temperature: "));
+  Serial.print(t);
+  Serial.print(F("C "));
+  Serial.print(f);
+  Serial.print(F("F  Heat index: "));
+  Serial.print(hic);
+  Serial.print(F("C "));
+  Serial.print(hif);
+  Serial.println(F("F"));
+
+  
+
+  int analogSensor = analogRead(smokeA0);
+  Serial.print("Smoke index: ");
+  Serial.print(analogSensor);
+  if (analogSensor > sensorThres){
+    
+    Serial.println("         ALERT: inflammable gas detected ");
+     digitalWrite(buzzerPin, HIGH);
+     delay(6000);
+     digitalWrite(buzzerPin,LOW);
+  }
+  
+  else{
+    
+    Serial.println("        No inflammable gas detected ");
+  }
+
+
+  int level = readSensor();
+  Serial.print("Water level:");
+  Serial.print(level);
+  
+  
+  if (level>110){
+    Serial.println("   Water Level HIGH");
+    digitalWrite(buzzerPin,HIGH);
+    delay(6000);
+    digitalWrite(buzzerPin,LOW);
+   }
+  else if (level<50){
+    Serial.println("   Water Level LOW");
+    
+    
+   }
+  else if (level>50 && level<110){
+    Serial.println("   Water Level Normal");    
+   }      
+  Serial.println("");
+  Serial.println("");
+  Serial.println("");
+  
+
+  
+
+  //check data serial from bluetooth android App
+  if (Serial.available() > 0){
+    val1 = Serial.read();
+   
+  }
+
+  //Relay is off
+  if( val1 == 49 ) {
+    digitalWrite(relay1,LOW); 
+    }
+  else if( val1 == 51 ) {
+    digitalWrite(relay2,LOW); 
+    }  
+  else if( val1 == 53 ) {
+    motor.write(0); 
+    }
+  else if( val1 == 55 ) {
+    digitalWrite(buzzerPin,HIGH); 
+    } 
+  
+    
+
+  
+  //relay is on
+  else if( val1 == 50 ) {
+    digitalWrite(relay1,HIGH); 
+    }
+  else if( val1 == 52 ) {
+    digitalWrite(relay2,HIGH);
+    }
+  else if( val1 == 54 ) {
+    motor.write(90);
+    }
+  else if( val1 == 56 ) {
+    digitalWrite(buzzerPin,LOW); 
+    } 
+
+   
+  
+  // Clears the trigPin condition
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  // Sets the trigPin HIGH (ACTIVE) for 10 microseconds
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+  // Calculating the distance
+  distance = duration * 0.034 / 2; // Speed of sound wave divided by 2 (go and back)
+  Serial.println(distance);
+  
+  
+  if (distance<25){
+    motor.write(0);
+    delay(2500);
+    motor.write(90);
+    }
+
+  delay(3000);
+}
